@@ -12,6 +12,18 @@ from reportlab.lib.pagesizes import A4
 st.set_page_config(page_title="SAM SMART ANALYTICS", layout="wide")
 
 # =====================================================
+# APP HEADER (LOGO + TITLE)
+# =====================================================
+col1, col2 = st.columns([1, 4])
+
+with col1:
+    if os.path.exists("logo.png"):
+        st.image("logo.png", width=120)
+
+with col2:
+    st.title("📊 SAM Smart Analytics")
+
+# =====================================================
 # CLEAN DATA
 # =====================================================
 def clean_data(df):
@@ -73,7 +85,7 @@ def generate_insights(total, avg, top, low, growth, cat_summary):
     ]
 
 # =====================================================
-# PDF REPORT (ADVANCED)
+# PDF REPORT
 # =====================================================
 def generate_full_report(df, cat_col, val_col, date_col):
 
@@ -88,15 +100,15 @@ def generate_full_report(df, cat_col, val_col, date_col):
     logo_path = "logo.png"
 
     def header(title):
-        try:
+        if os.path.exists(logo_path):
             elements.append(Image(logo_path, width=150, height=60))
-        except:
+        else:
             elements.append(Paragraph("SAM SMART ANALYTICS", styles["Title"]))
         elements.append(Spacer(1, 10))
         elements.append(Paragraph(title, styles["Heading2"]))
         elements.append(Spacer(1, 10))
 
-    # ================= PAGE 1 =================
+    # PAGE 1 - SUMMARY + BAR
     header("Executive Summary")
 
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
@@ -107,60 +119,48 @@ def generate_full_report(df, cat_col, val_col, date_col):
     cat_summary.plot(kind='bar')
     plt.xticks(rotation=45)
     plt.tight_layout()
-
     img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img1.name)
-    plt.close()
-
+    plt.savefig(img1.name); plt.close()
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # ================= PAGE 2 =================
-    header("Category Distribution (Pie Chart)")
+    # PAGE 2 - PIE
+    header("Category Distribution")
 
     plt.figure()
     cat_summary.plot(kind='pie', autopct='%1.1f%%')
     plt.ylabel("")
     plt.tight_layout()
-
     img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img2.name)
-    plt.close()
-
+    plt.savefig(img2.name); plt.close()
     elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # ================= PAGE 3 =================
-    header("Monthly Trend (Line Chart)")
+    # PAGE 3 - LINE
+    header("Monthly Trend")
 
     plt.figure()
     plt.plot(monthly["Month"].dt.strftime('%b'), monthly[val_col], marker='o')
     plt.xticks(rotation=45)
     plt.tight_layout()
-
     img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img3.name)
-    plt.close()
-
+    plt.savefig(img3.name); plt.close()
     elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # ================= PAGE 4 =================
-    header("Monthly Sales (Bar Chart)")
+    # PAGE 4 - MONTH BAR
+    header("Month-wise Sales")
 
     plt.figure()
     plt.bar(monthly["Month"].dt.strftime('%b'), monthly[val_col])
     plt.xticks(rotation=45)
     plt.tight_layout()
-
     img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img4.name)
-    plt.close()
-
+    plt.savefig(img4.name); plt.close()
     elements.append(Image(img4.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # ================= PAGE 5 =================
+    # PAGE 5 - TOP CATEGORY
     header("Top Category Trend")
 
     top_df = df[df[cat_col] == top]
@@ -170,35 +170,27 @@ def generate_full_report(df, cat_col, val_col, date_col):
     plt.plot(top_month["Month"].dt.strftime('%b'), top_month[val_col], marker='o')
     plt.xticks(rotation=45)
     plt.tight_layout()
-
     img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img5.name)
-    plt.close()
-
+    plt.savefig(img5.name); plt.close()
     elements.append(Image(img5.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # ================= PAGE 6 =================
+    # PAGE 6 - HORIZONTAL BAR
     header("Category Comparison")
 
     plt.figure()
     cat_summary.sort_values().plot(kind='barh')
     plt.tight_layout()
-
     img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img6.name)
-    plt.close()
-
+    plt.savefig(img6.name); plt.close()
     elements.append(Image(img6.name, width=500, height=300))
 
     doc.build(elements)
     return pdf_path
 
 # =====================================================
-# UI
+# FILE INPUT
 # =====================================================
-st.title("📊 SAM Smart Analytics")
-
 file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
 
 if file is not None:
@@ -210,6 +202,9 @@ else:
 df = clean_data(df)
 st.success("Data Loaded")
 
+# =====================================================
+# MAIN LOGIC
+# =====================================================
 try:
     date_col = st.selectbox("Date Column", df.columns)
     cat_col = st.selectbox("Category Column", df.columns)
@@ -242,3 +237,4 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Error: {e}")
+    
