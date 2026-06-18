@@ -3,6 +3,8 @@ import pandas as pd
 import plotly.express as px
 import tempfile
 import os
+import plotly.io as pio
+pio.kaleido.scope.chromium_args = ["--no-sandbox"]
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet
