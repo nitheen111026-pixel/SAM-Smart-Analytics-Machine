@@ -108,7 +108,7 @@ def generate_full_report(df, cat_col, val_col, date_col):
         elements.append(Paragraph(title, styles["Heading2"]))
         elements.append(Spacer(1, 10))
 
-    # PAGE 1 - SUMMARY + BAR
+    # PAGE 1
     header("Executive Summary")
 
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
@@ -120,11 +120,13 @@ def generate_full_report(df, cat_col, val_col, date_col):
     plt.xticks(rotation=45)
     plt.tight_layout()
     img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img1.name); plt.close()
+    plt.savefig(img1.name)
+    plt.close()
+
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 2 - PIE
+    # PAGE 2
     header("Category Distribution")
 
     plt.figure()
@@ -132,29 +134,26 @@ def generate_full_report(df, cat_col, val_col, date_col):
     plt.ylabel("")
     plt.tight_layout()
     img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img2.name); plt.close()
+    plt.savefig(img2.name)
+    plt.close()
+
     elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # ================= PAGE 3 =================
+    # PAGE 3
     header("Sales Trend with Average")
 
     months = monthly["Month"].dt.strftime('%b')
     values = monthly[val_col]
-
     avg_line = values.mean()
 
     plt.figure()
     plt.plot(months, values, marker='o', label="Sales")
-    plt.axhline(avg_line, linestyle='--', label=f"Average ({int(avg_line)})")
+    plt.axhline(avg_line, linestyle='--', label=f"Avg ({int(avg_line)})")
 
-    plt.title("Monthly Sales Trend")
-    plt.xlabel("Month")
-    plt.ylabel(val_col)
     plt.xticks(rotation=45)
     plt.legend()
     plt.grid(True)
-
     plt.tight_layout()
 
     img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -164,25 +163,21 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # ================= PAGE 4 =================
+    # PAGE 4
     header("Top Performing Months")
 
-    monthly["MonthName"] = monthly["Month"].dt.strftime('%b')
+    monthly_copy = monthly.copy()
+    monthly_copy["MonthName"] = monthly_copy["Month"].dt.strftime('%b')
 
-    top_months = monthly.sort_values(by=val_col, ascending=False).head(5)
+    top_months = monthly_copy.sort_values(by=val_col, ascending=False).head(5)
 
     plt.figure()
-
     bars = plt.bar(top_months["MonthName"], top_months[val_col])
-
-    plt.title("Top 5 Months by Sales")
-    plt.xlabel("Month")
-    plt.ylabel(val_col)
 
     for bar in bars:
         y = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, y,
-                 f'{int(y)}', ha='center', va='bottom')
+        plt.text(bar.get_x() + bar.get_width()/2, y, f'{int(y)}',
+                 ha='center', va='bottom')
 
     plt.tight_layout()
 
@@ -193,7 +188,7 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img4.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 5 - TOP CATEGORY
+    # PAGE 5
     header("Top Category Trend")
 
     top_df = df[df[cat_col] == top]
@@ -203,20 +198,79 @@ def generate_full_report(df, cat_col, val_col, date_col):
     plt.plot(top_month["Month"].dt.strftime('%b'), top_month[val_col], marker='o')
     plt.xticks(rotation=45)
     plt.tight_layout()
+
     img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img5.name); plt.close()
+    plt.savefig(img5.name)
+    plt.close()
+
     elements.append(Image(img5.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 6 - HORIZONTAL BAR
+    # PAGE 6
     header("Category Comparison")
 
     plt.figure()
     cat_summary.sort_values().plot(kind='barh')
     plt.tight_layout()
+
     img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img6.name); plt.close()
+    plt.savefig(img6.name)
+    plt.close()
+
     elements.append(Image(img6.name, width=500, height=300))
 
     doc.build(elements)
     return pdf_path
+
+# =====================================================
+# FILE INPUT
+# =====================================================
+file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
+
+if file is not None:
+    df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
+else:
+    st.warning("Please upload a file to continue")
+    st.stop()
+
+df = clean_data(df)
+st.success("Data Loaded")
+
+# =====================================================
+# MAIN LOGIC
+# =====================================================
+try:
+    date_col = st.selectbox("Date Column", df.columns)
+    cat_col = st.selectbox("Category Column", df.columns)
+    val_col = st.selectbox("Value Column", df.columns)
+
+    if not pd.api.types.is_numeric_dtype(df[val_col]):
+        st.error("❌ Value column must be numeric")
+        st.stop()
+
+    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+
+    total, avg, top, low, growth, cat_summary, monthly = analyze(df, cat_col, val_col, date_col)
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total", f"₹{total:,.0f}")
+    c2.metric("Top", top)
+    c3.metric("Growth %", f"{growth:.2f}%")
+
+    st.plotly_chart(px.bar(cat_summary.reset_index(), x=cat_col, y=val_col, color=cat_col))
+    st.plotly_chart(px.line(monthly, x="Month", y=val_col, markers=True))
+
+    st.subheader("Insights")
+    for line in generate_insights(total, avg, top, low, growth, cat_summary):
+        st.write(line)
+
+    if st.button("Generate PDF Report"):
+        try:
+            pdf = generate_full_report(df, cat_col, val_col, date_col)
+            with open(pdf, "rb") as f:
+                st.download_button("Download PDF", f, file_name="SAM_REPORT.pdf")
+        except Exception as e:
+            st.error(f"PDF Error: {e}")
+
+except Exception as e:
+    st.error(f"⚠️ Error: {e}")
