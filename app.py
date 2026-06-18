@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import tempfile
 import os
-import plotly.io as pio
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet
@@ -104,12 +103,14 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Spacer(1, 20))
 
     fig1 = px.bar(cat_summary.reset_index(), x=cat_col, y=val_col, color=cat_col)
-    fig1.update_layout(paper_bgcolor="white", plot_bgcolor="white")
 
-    img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig1.write_image(img1.name, scale=3)
+    try:
+        img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig1.write_image(img1.name, scale=3)
+        elements.append(Image(img1.name, width=500, height=300))
+    except:
+        elements.append(Paragraph("⚠️ Chart not available (Chrome missing)", styles["Normal"]))
 
-    elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
     # PAGE 2
@@ -118,25 +119,36 @@ def generate_full_report(df, cat_col, val_col, date_col):
     fig2 = px.pie(cat_summary.reset_index(), names=cat_col, values=val_col)
     fig3 = px.bar(cat_summary.reset_index(), x=cat_col, y=val_col, text_auto=True)
 
-    img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    try:
+        img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig2.write_image(img2.name, scale=3)
+        elements.append(Image(img2.name, width=500, height=250))
+    except:
+        elements.append(Paragraph("⚠️ Pie chart not available", styles["Normal"]))
 
-    fig2.write_image(img2.name, scale=3)
-    fig3.write_image(img3.name, scale=3)
-
-    elements.append(Image(img2.name, width=500, height=250))
     elements.append(Spacer(1, 10))
-    elements.append(Image(img3.name, width=500, height=250))
+
+    try:
+        img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig3.write_image(img3.name, scale=3)
+        elements.append(Image(img3.name, width=500, height=250))
+    except:
+        elements.append(Paragraph("⚠️ Bar chart not available", styles["Normal"]))
+
     elements.append(PageBreak())
 
     # PAGE 3
     header()
 
     fig4 = px.line(monthly, x="Month", y=val_col, markers=True)
-    img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig4.write_image(img4.name, scale=3)
 
-    elements.append(Image(img4.name, width=500, height=350))
+    try:
+        img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig4.write_image(img4.name, scale=3)
+        elements.append(Image(img4.name, width=500, height=350))
+    except:
+        elements.append(Paragraph("⚠️ Line chart not available", styles["Normal"]))
+
     elements.append(PageBreak())
 
     # PAGE 4
@@ -146,15 +158,17 @@ def generate_full_report(df, cat_col, val_col, date_col):
     top_month = complete_months(top_df, date_col, val_col)
 
     fig5 = px.bar(top_month, x="Month", y=val_col)
-    img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig5.write_image(img5.name, scale=3)
 
-    elements.append(Image(img5.name, width=500, height=350))
+    try:
+        img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+        fig5.write_image(img5.name, scale=3)
+        elements.append(Image(img5.name, width=500, height=350))
+    except:
+        elements.append(Paragraph("⚠️ Top category chart not available", styles["Normal"]))
 
     doc.build(elements)
 
     return pdf_path
-
 # =====================================================
 # UI
 # =====================================================
