@@ -149,47 +149,64 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # ================= PAGE 3 =================
-    header("Monthly Trend")
+     # ================= PAGE 3 =================
+header("Sales Trend with Average")
 
-    months = monthly["Month"].dt.strftime('%b')
+months = monthly["Month"].dt.strftime('%b')
+values = monthly[val_col]
 
-    plt.figure()
-    plt.plot(months, monthly[val_col], marker='o')
-    plt.title("Sales Trend")
-    plt.grid(True)
-    plt.xticks(rotation=45)
+avg_line = values.mean()
 
-    plt.tight_layout()
+plt.figure()
 
-    img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img3.name)
-    plt.close()
+plt.plot(months, values, marker='o', label="Sales")
+plt.axhline(avg_line, linestyle='--', label=f"Average ({int(avg_line)})")
 
-    elements.append(Image(img3.name, width=500, height=300))
-    elements.append(PageBreak())
+plt.title("Monthly Sales Trend")
+plt.xlabel("Month")
+plt.ylabel(val_col)
+plt.xticks(rotation=45)
+plt.legend()
+plt.grid(True)
 
-    # ================= PAGE 4 =================
-    header("Month-wise Sales")
+plt.tight_layout()
 
-    plt.figure()
-    bars = plt.bar(months, monthly[val_col])
-    plt.title("Monthly Sales")
-    plt.xticks(rotation=45)
+img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+plt.savefig(img3.name)
+plt.close()
 
-    for bar in bars:
-        y = bar.get_height()
-        plt.text(bar.get_x()+bar.get_width()/2, y,
-                 f'{int(y)}', ha='center', va='bottom', fontsize=7)
+elements.append(Image(img3.name, width=500, height=300))
+elements.append(PageBreak())
 
-    plt.tight_layout()
+# ================= PAGE 4 =================
+header("Top Performing Months")
 
-    img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img4.name)
-    plt.close()
+monthly["MonthName"] = monthly["Month"].dt.strftime('%b')
 
-    elements.append(Image(img4.name, width=500, height=300))
-    elements.append(PageBreak())
+top_months = monthly.sort_values(by=val_col, ascending=False).head(5)
+
+plt.figure()
+
+bars = plt.bar(top_months["MonthName"], top_months[val_col])
+
+plt.title("Top 5 Months by Sales")
+plt.xlabel("Month")
+plt.ylabel(val_col)
+
+# value labels
+for bar in bars:
+    y = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width()/2, y,
+             f'{int(y)}', ha='center', va='bottom')
+
+plt.tight_layout()
+
+img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+plt.savefig(img4.name)
+plt.close()
+
+elements.append(Image(img4.name, width=500, height=300))
+elements.append(PageBreak())
 
     # ================= PAGE 5 =================
     header("Top Category Performance")
