@@ -19,7 +19,7 @@ def clean_data(df):
     return df
 
 # =====================================================
-# COMPLETE MONTHS (GLOBAL FIX)
+# COMPLETE MONTHS
 # =====================================================
 def complete_months(df, date_col, val_col):
     df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
@@ -95,24 +95,14 @@ def generate_full_report(df, cat_col, val_col, date_col):
             elements.append(Image("logo.png", width=160, height=70))
         elements.append(Spacer(1, 10))
 
-    # ======================
     # PAGE 1
-    # ======================
     header()
-
     elements.append(Paragraph("EXECUTIVE SUMMARY", styles["Title"]))
     elements.append(Spacer(1, 10))
     elements.append(Paragraph(generate_insights(total, avg, top, low, growth, cat_summary), styles["Normal"]))
     elements.append(Spacer(1, 20))
 
-    fig1 = px.bar(
-        cat_summary.reset_index(),
-        x=cat_col,
-        y=val_col,
-        color=cat_col,
-        color_discrete_sequence=px.colors.qualitative.Bold
-    )
-
+    fig1 = px.bar(cat_summary.reset_index(), x=cat_col, y=val_col, color=cat_col)
     fig1.update_layout(paper_bgcolor="white", plot_bgcolor="white")
 
     img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -121,31 +111,11 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # ======================
     # PAGE 2
-    # ======================
     header()
 
-    fig2 = px.pie(
-        cat_summary.reset_index(),
-        names=cat_col,
-        values=val_col,
-        color=cat_col,
-        color_discrete_sequence=px.colors.qualitative.Set3
-    )
-
-    fig2.update_layout(paper_bgcolor="white")
-
-    fig3 = px.bar(
-        cat_summary.reset_index(),
-        x=cat_col,
-        y=val_col,
-        color=cat_col,
-        text_auto=True,
-        color_discrete_sequence=px.colors.qualitative.Bold
-    )
-
-    fig3.update_layout(paper_bgcolor="white", plot_bgcolor="white")
+    fig2 = px.pie(cat_summary.reset_index(), names=cat_col, values=val_col)
+    fig3 = px.bar(cat_summary.reset_index(), x=cat_col, y=val_col, text_auto=True)
 
     img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
@@ -158,46 +128,23 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img3.name, width=500, height=250))
     elements.append(PageBreak())
 
-    # ======================
     # PAGE 3
-    # ======================
     header()
 
     fig4 = px.line(monthly, x="Month", y=val_col, markers=True)
-
-    fig4.update_layout(
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        xaxis=dict(dtick="M1", tickformat="%b")
-    )
-
     img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     fig4.write_image(img4.name, scale=3)
 
     elements.append(Image(img4.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # ======================
     # PAGE 4
-    # ======================
     header()
 
     top_df = df[df[cat_col] == top]
     top_month = complete_months(top_df, date_col, val_col)
 
-    fig5 = px.bar(
-        top_month,
-        x="Month",
-        y=val_col,
-        color_discrete_sequence=["#28B463"]
-    )
-
-    fig5.update_layout(
-        paper_bgcolor="white",
-        plot_bgcolor="white",
-        xaxis=dict(dtick="M1", tickformat="%b")
-    )
-
+    fig5 = px.bar(top_month, x="Month", y=val_col)
     img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     fig5.write_image(img5.name, scale=3)
 
@@ -214,15 +161,33 @@ st.title("📊 SAM Smart Analytics")
 
 file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
 
-if file:
+# ✅ SAMPLE DATA SUPPORT
+if file is not None:
     df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
-    df = clean_data(df)
+else:
+    st.info("Using sample dataset (no file uploaded)")
+    df = pd.read_csv("sample_data.csv")
 
-    st.success("Data Loaded")
+df = clean_data(df)
+st.success("Data Loaded")
 
+# ✅ ERROR HANDLING
+try:
     date_col = st.selectbox("Date Column", df.columns)
     cat_col = st.selectbox("Category Column", df.columns)
     val_col = st.selectbox("Value Column", df.columns)
+
+    # Validate numeric column
+    if not pd.api.types.is_numeric_dtype(df[val_col]):
+        st.error("❌ Value column must be numeric")
+        st.stop()
+
+    # Validate date column
+    try:
+        df[date_col] = pd.to_datetime(df[date_col])
+    except:
+        st.error("❌ Invalid Date column")
+        st.stop()
 
     total, avg, top, low, growth, cat_summary, monthly = analyze(df, cat_col, val_col, date_col)
 
@@ -244,3 +209,6 @@ if file:
         pdf = generate_full_report(df, cat_col, val_col, date_col)
         with open(pdf, "rb") as f:
             st.download_button("Download PDF", f, file_name="SAM_REPORT.pdf")
+
+except Exception as e:
+    st.error(f"⚠️ Error: {e}")
