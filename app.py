@@ -101,14 +101,12 @@ def generate_full_report(df, cat_col, val_col, date_col):
 
     def header(title):
         if os.path.exists(logo_path):
-            elements.append(Image(logo_path, width=150, height=60))
-        else:
-            elements.append(Paragraph("SAM SMART ANALYTICS", styles["Title"]))
+            elements.append(Image(logo_path, width=140, height=55))
         elements.append(Spacer(1, 10))
         elements.append(Paragraph(title, styles["Heading2"]))
-        elements.append(Spacer(1, 10))
+        elements.append(Spacer(1, 15))
 
-    # PAGE 1 - SUMMARY + BAR
+    # ================= PAGE 1 =================
     header("Executive Summary")
 
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
@@ -116,76 +114,139 @@ def generate_full_report(df, cat_col, val_col, date_col):
         elements.append(Spacer(1, 8))
 
     plt.figure()
-    cat_summary.plot(kind='bar')
+    bars = plt.bar(cat_summary.index, cat_summary.values)
+    plt.title("Category Sales Overview")
     plt.xticks(rotation=45)
+
+    # ✅ Add value labels
+    for bar in bars:
+        y = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, y, f'{int(y)}',
+                 ha='center', va='bottom', fontsize=8)
+
     plt.tight_layout()
     img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img1.name); plt.close()
+    plt.savefig(img1.name)
+    plt.close()
+
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 2 - PIE
+    # ================= PAGE 2 =================
     header("Category Distribution")
 
     plt.figure()
-    cat_summary.plot(kind='pie', autopct='%1.1f%%')
-    plt.ylabel("")
+    plt.pie(cat_summary.values,
+            labels=cat_summary.index,
+            autopct='%1.1f%%',
+            startangle=90)
+
+    plt.title("Contribution by Category")
     plt.tight_layout()
+
     img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img2.name); plt.close()
+    plt.savefig(img2.name)
+    plt.close()
+
     elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # PAGE 3 - LINE
+    # ================= PAGE 3 =================
     header("Monthly Trend")
 
+    months = monthly["Month"].dt.strftime('%b')
+
     plt.figure()
-    plt.plot(monthly["Month"].dt.strftime('%b'), monthly[val_col], marker='o')
+    plt.plot(months, monthly[val_col], marker='o')
+    plt.title("Sales Trend Over Time")
+    plt.grid(True)
+
     plt.xticks(rotation=45)
+
+    # ✅ highlight last value
+    plt.text(len(months)-1, monthly[val_col].iloc[-1],
+             f"{int(monthly[val_col].iloc[-1])}")
+
     plt.tight_layout()
+
     img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img3.name); plt.close()
+    plt.savefig(img3.name)
+    plt.close()
+
     elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 4 - MONTH BAR
+    # ================= PAGE 4 =================
     header("Month-wise Sales")
 
     plt.figure()
-    plt.bar(monthly["Month"].dt.strftime('%b'), monthly[val_col])
+    bars = plt.bar(months, monthly[val_col])
+
+    plt.title("Monthly Sales Breakdown")
     plt.xticks(rotation=45)
+
+    # ✅ value labels
+    for bar in bars:
+        y = bar.get_height()
+        plt.text(bar.get_x()+bar.get_width()/2, y,
+                 f'{int(y)}', ha='center', va='bottom', fontsize=7)
+
     plt.tight_layout()
+
     img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img4.name); plt.close()
+    plt.savefig(img4.name)
+    plt.close()
+
     elements.append(Image(img4.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 5 - TOP CATEGORY
-    header("Top Category Trend")
+    # ================= PAGE 5 =================
+    header("Top Category Performance")
 
     top_df = df[df[cat_col] == top]
     top_month = complete_months(top_df, date_col, val_col)
 
+    months_top = top_month["Month"].dt.strftime('%b')
+
     plt.figure()
-    plt.plot(top_month["Month"].dt.strftime('%b'), top_month[val_col], marker='o')
+    plt.plot(months_top, top_month[val_col], marker='o')
+    plt.title(f"{top} Monthly Performance")
     plt.xticks(rotation=45)
+    plt.grid(True)
+
     plt.tight_layout()
+
     img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img5.name); plt.close()
+    plt.savefig(img5.name)
+    plt.close()
+
     elements.append(Image(img5.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 6 - HORIZONTAL BAR
+    # ================= PAGE 6 =================
     header("Category Comparison")
 
     plt.figure()
-    cat_summary.sort_values().plot(kind='barh')
+    bars = plt.barh(cat_summary.index, cat_summary.values)
+
+    plt.title("Category Comparison")
+
+    # ✅ value labels
+    for bar in bars:
+        x = bar.get_width()
+        plt.text(x, bar.get_y()+bar.get_height()/2,
+                 f'{int(x)}', va='center')
+
     plt.tight_layout()
+
     img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img6.name); plt.close()
+    plt.savefig(img6.name)
+    plt.close()
+
     elements.append(Image(img6.name, width=500, height=300))
 
     doc.build(elements)
+
     return pdf_path
 
 # =====================================================
