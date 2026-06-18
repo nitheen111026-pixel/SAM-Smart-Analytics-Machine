@@ -5,3 +5,4 @@ statsmodels
 openpyxl
 reportlab
 kaleido
+matplotlib
