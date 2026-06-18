@@ -107,31 +107,25 @@ def generate_full_report(df, cat_col, val_col, date_col):
     # ================= PAGE 1 =================
     header("Executive Summary")
 
-    # ✅ FIX: show insights properly
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
         elements.append(Paragraph(line, styles["Normal"]))
         elements.append(Spacer(1, 6))
 
-    fig1 = px.bar(
-        cat_summary.reset_index(),
-        x=cat_col,
-        y=val_col,
-        text=val_col,
-        color=cat_col,
-        color_discrete_sequence=px.colors.qualitative.Bold
-    )
+    plt.figure()
+    bars = plt.bar(cat_summary.index, cat_summary.values)
+    plt.title("Category Sales Overview")
+    plt.xticks(rotation=45)
 
-    fig1.update_traces(textposition='outside')
-    fig1.update_layout(
-        title="Category Sales Overview",
-        xaxis_title=cat_col,
-        yaxis_title=val_col,
-        paper_bgcolor="white",
-        plot_bgcolor="white"
-    )
+    for bar in bars:
+        y = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, y, f'{int(y)}',
+                 ha='center', va='bottom', fontsize=8)
+
+    plt.tight_layout()
 
     img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig1.write_image(img1.name, scale=3)
+    plt.savefig(img1.name)
+    plt.close()
 
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
@@ -139,44 +133,38 @@ def generate_full_report(df, cat_col, val_col, date_col):
     # ================= PAGE 2 =================
     header("Category Distribution")
 
-    fig2 = px.pie(
-        cat_summary.reset_index(),
-        names=cat_col,
-        values=val_col,
-        color_discrete_sequence=px.colors.qualitative.Set3
-    )
+    plt.figure()
+    plt.pie(cat_summary.values,
+            labels=cat_summary.index,
+            autopct='%1.1f%%',
+            startangle=90)
 
-    fig2.update_layout(title="Category Contribution", paper_bgcolor="white")
+    plt.title("Contribution by Category")
+    plt.tight_layout()
 
     img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig2.write_image(img2.name, scale=3)
+    plt.savefig(img2.name)
+    plt.close()
 
-    elements.append(Image(img2.name, width=500, height=300))
+    elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
     # ================= PAGE 3 =================
     header("Monthly Trend")
 
-    monthly["MonthName"] = monthly["Month"].dt.strftime('%b')
+    months = monthly["Month"].dt.strftime('%b')
 
-    fig3 = px.line(
-        monthly,
-        x="MonthName",
-        y=val_col,
-        markers=True,
-        color_discrete_sequence=["#E74C3C"]   # 🔴 RED
-    )
+    plt.figure()
+    plt.plot(months, monthly[val_col], marker='o')
+    plt.title("Sales Trend")
+    plt.grid(True)
+    plt.xticks(rotation=45)
 
-    fig3.update_layout(
-        title="Sales Trend Over Time",
-        xaxis_title="Month",
-        yaxis_title=val_col,
-        paper_bgcolor="white",
-        plot_bgcolor="white"
-    )
+    plt.tight_layout()
 
     img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig3.write_image(img3.name, scale=3)
+    plt.savefig(img3.name)
+    plt.close()
 
     elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
@@ -184,26 +172,21 @@ def generate_full_report(df, cat_col, val_col, date_col):
     # ================= PAGE 4 =================
     header("Month-wise Sales")
 
-    fig4 = px.bar(
-        monthly,
-        x="MonthName",
-        y=val_col,
-        text=val_col,
-        color_discrete_sequence=["#28B463"]   # 🟢 GREEN
-    )
+    plt.figure()
+    bars = plt.bar(months, monthly[val_col])
+    plt.title("Monthly Sales")
+    plt.xticks(rotation=45)
 
-    fig4.update_traces(textposition='outside')
+    for bar in bars:
+        y = bar.get_height()
+        plt.text(bar.get_x()+bar.get_width()/2, y,
+                 f'{int(y)}', ha='center', va='bottom', fontsize=7)
 
-    fig4.update_layout(
-        title="Monthly Sales Breakdown",
-        xaxis_title="Month",
-        yaxis_title=val_col,
-        paper_bgcolor="white",
-        plot_bgcolor="white"
-    )
+    plt.tight_layout()
 
     img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig4.write_image(img4.name, scale=3)
+    plt.savefig(img4.name)
+    plt.close()
 
     elements.append(Image(img4.name, width=500, height=300))
     elements.append(PageBreak())
@@ -213,24 +196,19 @@ def generate_full_report(df, cat_col, val_col, date_col):
 
     top_df = df[df[cat_col] == top]
     top_month = complete_months(top_df, date_col, val_col)
-    top_month["MonthName"] = top_month["Month"].dt.strftime('%b')
+    months_top = top_month["Month"].dt.strftime('%b')
 
-    fig5 = px.line(
-        top_month,
-        x="MonthName",
-        y=val_col,
-        markers=True,
-        color_discrete_sequence=["#8E44AD"]   # 🟣 PURPLE
-    )
+    plt.figure()
+    plt.plot(months_top, top_month[val_col], marker='o')
+    plt.title(f"{top} Performance")
+    plt.grid(True)
+    plt.xticks(rotation=45)
 
-    fig5.update_layout(
-        title=f"{top} Monthly Performance",
-        paper_bgcolor="white",
-        plot_bgcolor="white"
-    )
+    plt.tight_layout()
 
     img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig5.write_image(img5.name, scale=3)
+    plt.savefig(img5.name)
+    plt.close()
 
     elements.append(Image(img5.name, width=500, height=300))
     elements.append(PageBreak())
@@ -238,25 +216,20 @@ def generate_full_report(df, cat_col, val_col, date_col):
     # ================= PAGE 6 =================
     header("Category Comparison")
 
-    fig6 = px.bar(
-        cat_summary.sort_values().reset_index(),
-        x=val_col,
-        y=cat_col,
-        orientation='h',
-        text=val_col,
-        color_discrete_sequence=["#F39C12"]   # 🟠 ORANGE
-    )
+    plt.figure()
+    bars = plt.barh(cat_summary.index, cat_summary.values)
+    plt.title("Category Comparison")
 
-    fig6.update_traces(textposition='outside')
+    for bar in bars:
+        x = bar.get_width()
+        plt.text(x, bar.get_y()+bar.get_height()/2,
+                 f'{int(x)}', va='center')
 
-    fig6.update_layout(
-        title="Category Comparison",
-        paper_bgcolor="white",
-        plot_bgcolor="white"
-    )
+    plt.tight_layout()
 
     img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    fig6.write_image(img6.name, scale=3)
+    plt.savefig(img6.name)
+    plt.close()
 
     elements.append(Image(img6.name, width=500, height=300))
 
