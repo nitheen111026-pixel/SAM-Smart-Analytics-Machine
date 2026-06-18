@@ -1,92 +1,3 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import tempfile
-import os
-import matplotlib.pyplot as plt
-
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
-
-st.set_page_config(page_title="SAM SMART ANALYTICS", layout="wide")
-
-# =====================================================
-# APP HEADER (LOGO + TITLE)
-# =====================================================
-col1, col2 = st.columns([1, 4])
-
-with col1:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=120)
-
-with col2:
-    st.title("📊 SAM Smart Analytics")
-
-# =====================================================
-# CLEAN DATA
-# =====================================================
-def clean_data(df):
-    df.columns = df.columns.str.strip()
-    df = df.drop_duplicates().fillna(0)
-    return df
-
-# =====================================================
-# COMPLETE MONTHS
-# =====================================================
-def complete_months(df, date_col, val_col):
-    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
-
-    full_range = pd.date_range(
-        start=df[date_col].min(),
-        end=df[date_col].max(),
-        freq="MS"
-    )
-
-    full_df = pd.DataFrame({"Month": full_range})
-
-    monthly = df.groupby(pd.Grouper(key=date_col, freq="MS"))[val_col].sum().reset_index()
-    monthly.columns = ["Month", val_col]
-
-    monthly = full_df.merge(monthly, on="Month", how="left").fillna(0)
-
-    return monthly
-
-# =====================================================
-# ANALYSIS
-# =====================================================
-def analyze(df, cat_col, val_col, date_col):
-    cat_summary = df.groupby(cat_col)[val_col].sum().sort_values(ascending=False)
-    monthly = complete_months(df, date_col, val_col)
-
-    total = df[val_col].sum()
-    avg = df[val_col].mean()
-    top = cat_summary.idxmax()
-    low = cat_summary.idxmin()
-
-    growth = 0
-    if len(monthly) > 1:
-        growth = ((monthly[val_col].iloc[-1] - monthly[val_col].iloc[0]) / (monthly[val_col].iloc[0] + 1)) * 100
-
-    return total, avg, top, low, growth, cat_summary, monthly
-
-# =====================================================
-# INSIGHTS
-# =====================================================
-def generate_insights(total, avg, top, low, growth, cat_summary):
-    contribution = (cat_summary.max() / cat_summary.sum()) * 100
-
-    return [
-        f"Total Revenue: ₹{total:,.0f}",
-        f"Average Value: ₹{avg:,.0f}",
-        f"Top Category: {top} ({contribution:.1f}%)",
-        f"Lowest Category: {low}",
-        f"Growth: {growth:.2f}% ({'increasing' if growth>0 else 'decreasing'})"
-    ]
-
-# =====================================================
-# PDF REPORT
-# =====================================================
 def generate_full_report(df, cat_col, val_col, date_col):
 
     total, avg, top, low, growth, cat_summary, monthly = analyze(df, cat_col, val_col, date_col)
@@ -107,24 +18,31 @@ def generate_full_report(df, cat_col, val_col, date_col):
     # ================= PAGE 1 =================
     header("Executive Summary")
 
+    # ✅ FIX: show insights properly
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
         elements.append(Paragraph(line, styles["Normal"]))
         elements.append(Spacer(1, 6))
 
-    plt.figure()
-    bars = plt.bar(cat_summary.index, cat_summary.values)
-    plt.title("Category Sales Overview")
-    plt.xticks(rotation=45)
+    fig1 = px.bar(
+        cat_summary.reset_index(),
+        x=cat_col,
+        y=val_col,
+        text=val_col,
+        color=cat_col,
+        color_discrete_sequence=px.colors.qualitative.Bold
+    )
 
-    for bar in bars:
-        y = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, y, f'{int(y)}',
-                 ha='center', va='bottom', fontsize=8)
+    fig1.update_traces(textposition='outside')
+    fig1.update_layout(
+        title="Category Sales Overview",
+        xaxis_title=cat_col,
+        yaxis_title=val_col,
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
 
-    plt.tight_layout()
     img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img1.name)
-    plt.close()
+    fig1.write_image(img1.name, scale=3)
 
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
@@ -132,70 +50,71 @@ def generate_full_report(df, cat_col, val_col, date_col):
     # ================= PAGE 2 =================
     header("Category Distribution")
 
-    plt.figure()
-    plt.pie(cat_summary.values,
-            labels=cat_summary.index,
-            autopct='%1.1f%%',
-            startangle=90)
+    fig2 = px.pie(
+        cat_summary.reset_index(),
+        names=cat_col,
+        values=val_col,
+        color_discrete_sequence=px.colors.qualitative.Set3
+    )
 
-    plt.title("Contribution by Category")
-    plt.tight_layout()
+    fig2.update_layout(title="Category Contribution", paper_bgcolor="white")
 
     img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img2.name)
-    plt.close()
+    fig2.write_image(img2.name, scale=3)
 
-    elements.append(Image(img2.name, width=500, height=350))
+    elements.append(Image(img2.name, width=500, height=300))
     elements.append(PageBreak())
 
     # ================= PAGE 3 =================
-    header("Sales Trend with Average")
+    header("Monthly Trend")
 
-    months = monthly["Month"].dt.strftime('%b')
-    values = monthly[val_col]
-    avg_line = values.mean()
+    monthly["MonthName"] = monthly["Month"].dt.strftime('%b')
 
-    plt.figure()
-    plt.plot(months, values, marker='o', label="Sales")
-    plt.axhline(avg_line, linestyle='--', label=f"Average ({int(avg_line)})")
+    fig3 = px.line(
+        monthly,
+        x="MonthName",
+        y=val_col,
+        markers=True,
+        color_discrete_sequence=["#E74C3C"]   # 🔴 RED
+    )
 
-    plt.title("Monthly Sales Trend")
-    plt.xlabel("Month")
-    plt.ylabel(val_col)
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.grid(True)
+    fig3.update_layout(
+        title="Sales Trend Over Time",
+        xaxis_title="Month",
+        yaxis_title=val_col,
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
 
-    plt.tight_layout()
     img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img3.name)
-    plt.close()
+    fig3.write_image(img3.name, scale=3)
 
     elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
 
     # ================= PAGE 4 =================
-    header("Top Performing Months")
+    header("Month-wise Sales")
 
-    monthly["MonthName"] = monthly["Month"].dt.strftime('%b')
-    top_months = monthly.sort_values(by=val_col, ascending=False).head(5)
+    fig4 = px.bar(
+        monthly,
+        x="MonthName",
+        y=val_col,
+        text=val_col,
+        color_discrete_sequence=["#28B463"]   # 🟢 GREEN
+    )
 
-    plt.figure()
-    bars = plt.bar(top_months["MonthName"], top_months[val_col])
+    fig4.update_traces(textposition='outside')
 
-    plt.title("Top 5 Months by Sales")
-    plt.xlabel("Month")
-    plt.ylabel(val_col)
+    fig4.update_layout(
+        title="Monthly Sales Breakdown",
+        xaxis_title="Month",
+        yaxis_title=val_col,
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
 
-    for bar in bars:
-        y = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, y,
-                 f'{int(y)}', ha='center', va='bottom')
-
-    plt.tight_layout()
     img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img4.name)
-    plt.close()
+    fig4.write_image(img4.name, scale=3)
 
     elements.append(Image(img4.name, width=500, height=300))
     elements.append(PageBreak())
@@ -205,18 +124,24 @@ def generate_full_report(df, cat_col, val_col, date_col):
 
     top_df = df[df[cat_col] == top]
     top_month = complete_months(top_df, date_col, val_col)
-    months_top = top_month["Month"].dt.strftime('%b')
+    top_month["MonthName"] = top_month["Month"].dt.strftime('%b')
 
-    plt.figure()
-    plt.plot(months_top, top_month[val_col], marker='o')
-    plt.title(f"{top} Performance")
-    plt.grid(True)
-    plt.xticks(rotation=45)
+    fig5 = px.line(
+        top_month,
+        x="MonthName",
+        y=val_col,
+        markers=True,
+        color_discrete_sequence=["#8E44AD"]   # 🟣 PURPLE
+    )
 
-    plt.tight_layout()
+    fig5.update_layout(
+        title=f"{top} Monthly Performance",
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
+
     img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img5.name)
-    plt.close()
+    fig5.write_image(img5.name, scale=3)
 
     elements.append(Image(img5.name, width=500, height=300))
     elements.append(PageBreak())
@@ -224,23 +149,28 @@ def generate_full_report(df, cat_col, val_col, date_col):
     # ================= PAGE 6 =================
     header("Category Comparison")
 
-    plt.figure()
-    bars = plt.barh(cat_summary.index, cat_summary.values)
-    plt.title("Category Comparison")
+    fig6 = px.bar(
+        cat_summary.sort_values().reset_index(),
+        x=val_col,
+        y=cat_col,
+        orientation='h',
+        text=val_col,
+        color_discrete_sequence=["#F39C12"]   # 🟠 ORANGE
+    )
 
-    for bar in bars:
-        x = bar.get_width()
-        plt.text(x, bar.get_y()+bar.get_height()/2,
-                 f'{int(x)}', va='center')
+    fig6.update_traces(textposition='outside')
 
-    plt.tight_layout()
+    fig6.update_layout(
+        title="Category Comparison",
+        paper_bgcolor="white",
+        plot_bgcolor="white"
+    )
+
     img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img6.name)
-    plt.close()
+    fig6.write_image(img6.name, scale=3)
 
     elements.append(Image(img6.name, width=500, height=300))
 
     doc.build(elements)
 
     return pdf_path
-    
