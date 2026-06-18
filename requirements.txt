@@ -1,8 +1,6 @@
 streamlit
 pandas
 plotly
-statsmodels
+matplotlib
 openpyxl
 reportlab
-kaleido
-matplotlib
