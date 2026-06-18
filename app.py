@@ -73,36 +73,7 @@ def generate_insights(total, avg, top, low, growth, cat_summary):
     ]
 
 # =====================================================
-# MATPLOTLIB CHARTS FOR PDF
-# =====================================================
-def save_bar_chart(cat_summary, cat_col, val_col):
-    img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.figure()
-    cat_summary.plot(kind='bar')
-    plt.title("Category Analysis")
-    plt.xlabel(cat_col)
-    plt.ylabel(val_col)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.savefig(img.name)
-    plt.close()
-    return img.name
-
-def save_line_chart(monthly, val_col):
-    img = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.figure()
-    plt.plot(monthly["Month"], monthly[val_col], marker='o')
-    plt.title("Monthly Trend")
-    plt.xlabel("Month")
-    plt.ylabel(val_col)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.savefig(img.name)
-    plt.close()
-    return img.name
-
-# =====================================================
-# PDF REPORT
+# PDF REPORT (ADVANCED)
 # =====================================================
 def generate_full_report(df, cat_col, val_col, date_col):
 
@@ -114,35 +85,111 @@ def generate_full_report(df, cat_col, val_col, date_col):
     styles = getSampleStyleSheet()
     elements = []
 
-    # PAGE 1
-    elements.append(Paragraph("EXECUTIVE SUMMARY", styles["Title"]))
-    elements.append(Spacer(1, 10))
+    logo_path = "logo.png"
+
+    def header(title):
+        try:
+            elements.append(Image(logo_path, width=150, height=60))
+        except:
+            elements.append(Paragraph("SAM SMART ANALYTICS", styles["Title"]))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(title, styles["Heading2"]))
+        elements.append(Spacer(1, 10))
+
+    # ================= PAGE 1 =================
+    header("Executive Summary")
 
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
         elements.append(Paragraph(line, styles["Normal"]))
         elements.append(Spacer(1, 8))
 
-    elements.append(Spacer(1, 15))
+    plt.figure()
+    cat_summary.plot(kind='bar')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
 
-    img1 = save_bar_chart(cat_summary, cat_col, val_col)
-    elements.append(Image(img1, width=500, height=300))
+    img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img1.name)
+    plt.close()
+
+    elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 2
-    img2 = save_bar_chart(cat_summary, cat_col, val_col)
-    elements.append(Image(img2, width=500, height=300))
+    # ================= PAGE 2 =================
+    header("Category Distribution (Pie Chart)")
+
+    plt.figure()
+    cat_summary.plot(kind='pie', autopct='%1.1f%%')
+    plt.ylabel("")
+    plt.tight_layout()
+
+    img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img2.name)
+    plt.close()
+
+    elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # PAGE 3
-    img3 = save_line_chart(monthly, val_col)
-    elements.append(Image(img3, width=500, height=300))
+    # ================= PAGE 3 =================
+    header("Monthly Trend (Line Chart)")
+
+    plt.figure()
+    plt.plot(monthly["Month"].dt.strftime('%b'), monthly[val_col], marker='o')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img3.name)
+    plt.close()
+
+    elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 4
+    # ================= PAGE 4 =================
+    header("Monthly Sales (Bar Chart)")
+
+    plt.figure()
+    plt.bar(monthly["Month"].dt.strftime('%b'), monthly[val_col])
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img4.name)
+    plt.close()
+
+    elements.append(Image(img4.name, width=500, height=300))
+    elements.append(PageBreak())
+
+    # ================= PAGE 5 =================
+    header("Top Category Trend")
+
     top_df = df[df[cat_col] == top]
     top_month = complete_months(top_df, date_col, val_col)
-    img4 = save_line_chart(top_month, val_col)
-    elements.append(Image(img4, width=500, height=300))
+
+    plt.figure()
+    plt.plot(top_month["Month"].dt.strftime('%b'), top_month[val_col], marker='o')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img5.name)
+    plt.close()
+
+    elements.append(Image(img5.name, width=500, height=300))
+    elements.append(PageBreak())
+
+    # ================= PAGE 6 =================
+    header("Category Comparison")
+
+    plt.figure()
+    cat_summary.sort_values().plot(kind='barh')
+    plt.tight_layout()
+
+    img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img6.name)
+    plt.close()
+
+    elements.append(Image(img6.name, width=500, height=300))
 
     doc.build(elements)
     return pdf_path
@@ -169,7 +216,7 @@ try:
     val_col = st.selectbox("Value Column", df.columns)
 
     if not pd.api.types.is_numeric_dtype(df[val_col]):
-        st.error("Value column must be numeric")
+        st.error("❌ Value column must be numeric")
         st.stop()
 
     df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
@@ -194,4 +241,4 @@ try:
             st.download_button("Download PDF", f, file_name="SAM_REPORT.pdf")
 
 except Exception as e:
-    st.error(f"Error: {e}")
+    st.error(f"⚠️ Error: {e}")
