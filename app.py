@@ -9,7 +9,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Page
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
-st.set_page_config(page_title="SAM SMART ANALYTICS", layout="wide")
+st.set_page_config(page_title="SAM SMART ANALYTICS MACHINE", layout="wide")
 
 # =====================================================
 # APP HEADER (LOGO + TITLE)
