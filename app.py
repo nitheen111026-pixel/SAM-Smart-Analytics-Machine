@@ -228,13 +228,17 @@ def generate_full_report(df, cat_col, val_col, date_col):
 file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
 
 if file is not None:
-    df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
-else:
-    if os.path.exists("sample_data.xlsx"):
-        st.info("📊 Using Sample Dataset (Demo Mode)")
-        df = pd.read_excel("sample_data.xlsx")
+    if file.name.endswith(".csv"):
+        df = pd.read_csv(file)
     else:
-        st.error("❌ Sample file not found. Please upload a file.")
+        df = pd.read_excel(file)
+
+else:
+    if os.path.exists("sample_data.csv"):
+        st.info("📊 Using Sample Dataset (Demo Mode)")
+        df = pd.read_csv("sample_data.csv")   # ✅ CORRECT
+    else:
+        st.error("❌ sample_data.csv not found")
         st.stop()
 
 df = clean_data(df)
