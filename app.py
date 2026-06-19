@@ -21,7 +21,7 @@ with col1:
         st.image("logo.png", width=120)
 
 with col2:
-    st.title("📊 VAAIKAL NAYAGAN NISHANTH RAJ")
+    st.title("📊 SAM-Smart Analytics Machine")
 
 # =====================================================
 # CLEAN DATA
