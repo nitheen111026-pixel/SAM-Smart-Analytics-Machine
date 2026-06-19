@@ -230,8 +230,12 @@ file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
 if file is not None:
     df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
 else:
-    st.warning("Please upload a file to continue")
-    st.stop()
+    if os.path.exists("sample_data.xlsx"):
+        st.info("📊 Using Sample Dataset (Demo Mode)")
+        df = pd.read_excel("sample_data.xlsx")
+    else:
+        st.error("❌ Sample file not found. Please upload a file.")
+        st.stop()
 
 df = clean_data(df)
 st.success("Data Loaded")
