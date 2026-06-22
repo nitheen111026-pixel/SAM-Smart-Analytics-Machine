@@ -21,7 +21,7 @@ with col1:
         st.image("logo.png", width=120)
 
 with col2:
-    st.title("📊 KUNDS (E) SANDHANAVALLI")
+    st.title("📊 SAM-SMART ANALYTICS MACHINE ")
 
 # =====================================================
 # CLEAN DATA
