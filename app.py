@@ -4,12 +4,50 @@ import plotly.express as px
 import tempfile
 import os
 import matplotlib.pyplot as plt
+import base64   # ✅ ADDED
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
 st.set_page_config(page_title="SAM SMART ANALYTICS MACHINE", layout="wide")
+
+# =====================================================
+# BACKGROUND IMAGE (✅ ADDED)
+# =====================================================
+def set_bg(image_file):
+    if os.path.exists(image_file):
+        with open(image_file, "rb") as f:
+            encoded = base64.b64encode(f.read()).decode()
+
+        st.markdown(
+            f"""
+            <style>
+            .stApp {{
+                background: url("data:image/jpg;base64,{encoded}") no-repeat center center fixed;
+                background-size: cover;
+            }}
+
+            section[data-testid="stAppViewContainer"] {{
+                background: transparent;
+            }}
+
+            section[data-testid="stHeader"] {{
+                background: transparent;
+            }}
+
+            .main {{
+                background-color: rgba(255,255,255,0.92);
+                padding: 20px;
+                border-radius: 10px;
+            }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+# ✅ APPLY BACKGROUND
+set_bg("background.jpg")
 
 # =====================================================
 # APP HEADER (LOGO + TITLE)
@@ -236,7 +274,7 @@ if file is not None:
 else:
     if os.path.exists("sample_data.csv"):
         st.info("📊 Using Sample Dataset (Demo Mode)")
-        df = pd.read_csv("sample_data.csv")   # ✅ CORRECT
+        df = pd.read_csv("sample_data.csv")
     else:
         st.error("❌ sample_data.csv not found")
         st.stop()
