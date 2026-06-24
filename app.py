@@ -4,7 +4,7 @@ import plotly.express as px
 import tempfile
 import os
 import matplotlib.pyplot as plt
-import base64   # ✅ ADDED
+import base64
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet
@@ -13,7 +13,7 @@ from reportlab.lib.pagesizes import A4
 st.set_page_config(page_title="SAM SMART ANALYTICS MACHINE", layout="wide")
 
 # =====================================================
-# BACKGROUND IMAGE (✅ ADDED)
+# BACKGROUND IMAGE
 # =====================================================
 def set_bg(image_file):
     if os.path.exists(image_file):
@@ -27,15 +27,12 @@ def set_bg(image_file):
                 background: url("data:image/jpg;base64,{encoded}") no-repeat center center fixed;
                 background-size: cover;
             }}
-
             section[data-testid="stAppViewContainer"] {{
                 background: transparent;
             }}
-
             section[data-testid="stHeader"] {{
                 background: transparent;
             }}
-
             .main {{
                 background-color: rgba(255,255,255,0.92);
                 padding: 20px;
@@ -46,11 +43,10 @@ def set_bg(image_file):
             unsafe_allow_html=True
         )
 
-# ✅ APPLY BACKGROUND
 set_bg("background.jpg")
 
 # =====================================================
-# APP HEADER (LOGO + TITLE)
+# HEADER
 # =====================================================
 col1, col2 = st.columns([1, 4])
 
@@ -146,7 +142,6 @@ def generate_full_report(df, cat_col, val_col, date_col):
         elements.append(Paragraph(title, styles["Heading2"]))
         elements.append(Spacer(1, 10))
 
-    # PAGE 1
     header("Executive Summary")
 
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
@@ -164,7 +159,6 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 2
     header("Category Distribution")
 
     plt.figure()
@@ -178,7 +172,6 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # PAGE 3
     header("Sales Trend with Average")
 
     months = monthly["Month"].dt.strftime('%b')
@@ -201,7 +194,6 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 4
     header("Top Performing Months")
 
     monthly_copy = monthly.copy()
@@ -226,7 +218,6 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img4.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 5
     header("Top Category Trend")
 
     top_df = df[df[cat_col] == top]
@@ -244,7 +235,6 @@ def generate_full_report(df, cat_col, val_col, date_col):
     elements.append(Image(img5.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 6
     header("Category Comparison")
 
     plt.figure()
@@ -270,7 +260,6 @@ if file is not None:
         df = pd.read_csv(file)
     else:
         df = pd.read_excel(file)
-
 else:
     if os.path.exists("sample_data.csv"):
         st.info("📊 Using Sample Dataset (Demo Mode)")
@@ -289,6 +278,28 @@ try:
     date_col = st.selectbox("Date Column", df.columns)
     cat_col = st.selectbox("Category Column", df.columns)
     val_col = st.selectbox("Value Column", df.columns)
+
+    # ================= NEW FEATURE ADDED HERE =================
+    st.markdown("### 🧭 Smart Column Guide")
+
+    g1, g2, g3 = st.columns(3)
+
+    with g1:
+        st.markdown("#### 📅 Date Column")
+        st.write("• Order Date")
+
+    with g2:
+        st.markdown("#### 📂 Category Column")
+        st.write("• City")
+        st.write("• Category")
+        st.write("• Product")
+
+    with g3:
+        st.markdown("#### 💰 Value Column")
+        st.write("• Sales")
+        st.write("• Profit")
+        st.write("• Quantity")
+    # ==========================================================
 
     if not pd.api.types.is_numeric_dtype(df[val_col]):
         st.error("❌ Value column must be numeric")
