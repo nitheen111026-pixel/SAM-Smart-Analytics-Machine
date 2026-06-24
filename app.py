@@ -279,28 +279,27 @@ try:
     cat_col = st.selectbox("Category Column", df.columns)
     val_col = st.selectbox("Value Column", df.columns)
 
-    # ================= NEW FEATURE (VISIBLE FIX) =================
-st.markdown("---")
-st.markdown("## 🧭 Smart Column Guide")
+    # ✅ NEW FEATURE (FIXED POSITION + INDENT)
+    st.markdown("---")
+    st.markdown("## 🧭 Smart Column Guide")
 
-with st.expander("📌 Click to understand column usage (IMPORTANT)", expanded=True):
+    with st.expander("📌 Click to understand column usage (IMPORTANT)", expanded=True):
 
-    g1, g2, g3 = st.columns(3)
+        g1, g2, g3 = st.columns(3)
 
-    with g1:
-        st.markdown("### 📅 Date Column")
-        st.success("Use: Order Date")
+        with g1:
+            st.markdown("### 📅 Date Column")
+            st.success("Use: Order Date")
 
-    with g2:
-        st.markdown("### 📂 Category Column")
-        st.success("Use: City, Category, Product")
+        with g2:
+            st.markdown("### 📂 Category Column")
+            st.success("Use: City, Category, Product")
 
-    with g3:
-        st.markdown("### 💰 Value Column")
-        st.success("Use: Sales, Profit, Quantity")
+        with g3:
+            st.markdown("### 💰 Value Column")
+            st.success("Use: Sales, Profit, Quantity")
 
-st.markdown("---")
-# ============================================================
+    st.markdown("---")
 
     if not pd.api.types.is_numeric_dtype(df[val_col]):
         st.error("❌ Value column must be numeric")
