@@ -104,6 +104,57 @@ def generate_insights(total, avg, top, low, growth, cat_summary):
     ]
 
 # =====================================================
+# ✅ PDF REPORT (RESTORED)
+# =====================================================
+def generate_full_report(df, cat_col, val_col, date_col):
+
+    total, avg, top, low, growth, cat_summary, monthly = analyze(df, cat_col, val_col, date_col)
+
+    pdf_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
+    doc = SimpleDocTemplate(pdf_path, pagesize=A4)
+
+    styles = getSampleStyleSheet()
+    elements = []
+
+    def header(title):
+        elements.append(Paragraph("SAM SMART ANALYTICS MACHINE", styles["Title"]))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(title, styles["Heading2"]))
+        elements.append(Spacer(1, 10))
+
+    header("Executive Summary")
+
+    for line in generate_insights(total, avg, top, low, growth, cat_summary):
+        elements.append(Paragraph(line, styles["Normal"]))
+        elements.append(Spacer(1, 8))
+
+    # Chart 1
+    plt.figure()
+    cat_summary.plot(kind='bar')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img1.name)
+    plt.close()
+    elements.append(Image(img1.name, width=500, height=300))
+    elements.append(PageBreak())
+
+    # Chart 2
+    header("Category Distribution")
+    plt.figure()
+    cat_summary.plot(kind='pie', autopct='%1.1f%%')
+    plt.ylabel("")
+    plt.tight_layout()
+    img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img2.name)
+    plt.close()
+    elements.append(Image(img2.name, width=500, height=350))
+    elements.append(PageBreak())
+
+    doc.build(elements)
+    return pdf_path
+
+# =====================================================
 # FILE INPUT
 # =====================================================
 file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
@@ -128,12 +179,10 @@ st.success("Data Loaded")
 # MAIN LOGIC
 # =====================================================
 try:
-    # ✅ ONLY CHANGE: RESTRICT OPTIONS
     date_col = st.selectbox("Date Column", [c for c in df.columns if c.lower() == "order_date"])
     cat_col = st.selectbox("Category Column", [c for c in df.columns if c.lower() in ["city", "category", "product"]])
     val_col = st.selectbox("Value Column", [c for c in df.columns if c.lower() in ["sales", "profit", "quantity"]])
 
-    # ✅ KEEPING YOUR SMART GUIDE
     st.markdown("---")
     st.markdown("## 🧭 Smart Column Guide")
 
@@ -173,6 +222,15 @@ try:
     st.subheader("Insights")
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
         st.write(line)
+
+    # ✅ PDF BUTTON BACK
+    if st.button("Generate PDF Report"):
+        try:
+            pdf = generate_full_report(df, cat_col, val_col, date_col)
+            with open(pdf, "rb") as f:
+                st.download_button("Download PDF", f, file_name="SAM_REPORT.pdf")
+        except Exception as e:
+            st.error(f"PDF Error: {e}")
 
 except Exception as e:
     st.error(f"⚠️ Error: {e}")
