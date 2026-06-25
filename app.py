@@ -13,7 +13,7 @@ from reportlab.lib.pagesizes import A4
 st.set_page_config(page_title="SAM SMART ANALYTICS MACHINE", layout="wide")
 
 # =====================================================
-# BACKGROUND + TEXT FIX
+# BACKGROUND IMAGE + TEXT + MOBILE FIX
 # =====================================================
 def set_bg(image_file):
     if os.path.exists(image_file):
@@ -27,15 +27,24 @@ def set_bg(image_file):
             background-size: cover;
         }}
 
-        /* FORCE WHITE TEXT */
-        * {{
+        section[data-testid="stAppViewContainer"] {{
+            background: transparent;
+        }}
+
+        section[data-testid="stHeader"] {{
+            background: transparent;
+        }}
+
+        /* ✅ FORCE ALL TEXT WHITE */
+        html, body, [class*="css"] {{
             color: white !important;
         }}
 
-        /* MOBILE LOGO FIX */
+        /* ✅ MOBILE LOGO SIZE */
         @media (max-width: 768px) {{
             img {{
-                width: 80px !important;
+                max-width: 80px !important;
+                height: auto !important;
             }}
         }}
         </style>
@@ -69,13 +78,19 @@ def clean_data(df):
 def complete_months(df, date_col, val_col):
     df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
 
-    full_range = pd.date_range(start=df[date_col].min(), end=df[date_col].max(), freq="MS")
+    full_range = pd.date_range(
+        start=df[date_col].min(),
+        end=df[date_col].max(),
+        freq="MS"
+    )
+
     full_df = pd.DataFrame({"Month": full_range})
 
     monthly = df.groupby(pd.Grouper(key=date_col, freq="MS"))[val_col].sum().reset_index()
     monthly.columns = ["Month", val_col]
 
     monthly = full_df.merge(monthly, on="Month", how="left").fillna(0)
+
     return monthly
 
 # =====================================================
@@ -106,11 +121,11 @@ def generate_insights(total, avg, top, low, growth, cat_summary):
         f"Average Value: ₹{avg:,.0f}",
         f"Top Category: {top} ({contribution:.1f}%)",
         f"Lowest Category: {low}",
-        f"Growth: {growth:.2f}%"
+        f"Growth: {growth:.2f}% ({'increasing' if growth>0 else 'decreasing'})"
     ]
 
 # =====================================================
-# PDF REPORT (UPDATED)
+# PDF REPORT (UNCHANGED)
 # =====================================================
 def generate_full_report(df, cat_col, val_col, date_col):
 
@@ -122,24 +137,20 @@ def generate_full_report(df, cat_col, val_col, date_col):
     styles = getSampleStyleSheet()
     elements = []
 
-    # ===== PAGE 1 (COVER) =====
-    if os.path.exists("logo.png"):
-        elements.append(Spacer(1, 150))
-        elements.append(Image("logo.png", width=300, height=150))
+    logo_path = "logo.png"
 
-    elements.append(Spacer(1, 42))
-    elements.append(Paragraph("SMART ANALYTICS MACHINE", styles["Title"]))
-    elements.append(Spacer(1, 30))
-    elements.append(Paragraph("DEVELOPED BY NITHEEN.M", styles["Title"]))
-    elements.append(PageBreak())
+    def header(title):
+        if os.path.exists(logo_path):
+            elements.append(Image(logo_path, width=150, height=60))
+        else:
+            elements.append(Paragraph("SAM SMART ANALYTICS", styles["Title"]))
+        elements.append(Spacer(1, 10))
+        elements.append(Paragraph(title, styles["Heading2"]))
+        elements.append(Spacer(1, 10))
 
-    def watermark():
-        elements.append(Spacer(1, 100))
-        elements.append(Paragraph("<font size=50 color=lightgrey>SAM</font>", styles["Title"]))
-        elements.append(Spacer(1, 50))
+    # PAGE 1
+    header("Executive Summary")
 
-    # PAGE 2
-    watermark()
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
         elements.append(Paragraph(line, styles["Normal"]))
         elements.append(Spacer(1, 8))
@@ -151,51 +162,102 @@ def generate_full_report(df, cat_col, val_col, date_col):
     img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     plt.savefig(img1.name)
     plt.close()
+
     elements.append(Image(img1.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 3
-    watermark()
+    # PAGE 2
+    header("Category Distribution")
+
     plt.figure()
     cat_summary.plot(kind='pie', autopct='%1.1f%%')
+    plt.ylabel("")
     plt.tight_layout()
     img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     plt.savefig(img2.name)
     plt.close()
+
     elements.append(Image(img2.name, width=500, height=350))
     elements.append(PageBreak())
 
-    # PAGE 4
-    watermark()
+    # PAGE 3
+    header("Sales Trend with Average")
+
+    months = monthly["Month"].dt.strftime('%b')
+    values = monthly[val_col]
+    avg_line = values.mean()
+
     plt.figure()
-    plt.plot(monthly["Month"], monthly[val_col])
+    plt.plot(months, values, marker='o', label="Sales")
+    plt.axhline(avg_line, linestyle='--', label=f"Avg ({int(avg_line)})")
+
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.grid(True)
     plt.tight_layout()
+
     img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     plt.savefig(img3.name)
     plt.close()
+
     elements.append(Image(img3.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 5
-    watermark()
+    # PAGE 4
+    header("Top Performing Months")
+
+    monthly_copy = monthly.copy()
+    monthly_copy["MonthName"] = monthly_copy["Month"].dt.strftime('%b')
+
+    top_months = monthly_copy.sort_values(by=val_col, ascending=False).head(5)
+
     plt.figure()
-    monthly.head(5).plot(x="Month", y=val_col)
+    bars = plt.bar(top_months["MonthName"], top_months[val_col])
+
+    for bar in bars:
+        y = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, y, f'{int(y)}',
+                 ha='center', va='bottom')
+
     plt.tight_layout()
+
     img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     plt.savefig(img4.name)
     plt.close()
+
     elements.append(Image(img4.name, width=500, height=300))
     elements.append(PageBreak())
 
-    # PAGE 6
-    watermark()
+    # PAGE 5
+    header("Top Category Trend")
+
+    top_df = df[df[cat_col] == top]
+    top_month = complete_months(top_df, date_col, val_col)
+
     plt.figure()
-    cat_summary.sort_values().plot(kind='barh')
+    plt.plot(top_month["Month"].dt.strftime('%b'), top_month[val_col], marker='o')
+    plt.xticks(rotation=45)
     plt.tight_layout()
+
     img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
     plt.savefig(img5.name)
     plt.close()
+
     elements.append(Image(img5.name, width=500, height=300))
+    elements.append(PageBreak())
+
+    # PAGE 6
+    header("Category Comparison")
+
+    plt.figure()
+    cat_summary.sort_values().plot(kind='barh')
+    plt.tight_layout()
+
+    img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+    plt.savefig(img6.name)
+    plt.close()
+
+    elements.append(Image(img6.name, width=500, height=300))
 
     doc.build(elements)
     return pdf_path
@@ -237,16 +299,25 @@ try:
 
     total, avg, top, low, growth, cat_summary, monthly = analyze(df, cat_col, val_col, date_col)
 
-    st.plotly_chart(px.bar(cat_summary.reset_index(), x=cat_col, y=val_col))
-    st.plotly_chart(px.line(monthly, x="Month", y=val_col))
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total", f"₹{total:,.0f}")
+    c2.metric("Top", top)
+    c3.metric("Growth %", f"{growth:.2f}%")
 
+    st.plotly_chart(px.bar(cat_summary.reset_index(), x=cat_col, y=val_col, color=cat_col))
+    st.plotly_chart(px.line(monthly, x="Month", y=val_col, markers=True))
+
+    st.subheader("Insights")
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
         st.write(line)
 
     if st.button("Generate PDF Report"):
-        pdf = generate_full_report(df, cat_col, val_col, date_col)
-        with open(pdf, "rb") as f:
-            st.download_button("Download PDF", f, file_name="SAM_REPORT.pdf")
+        try:
+            pdf = generate_full_report(df, cat_col, val_col, date_col)
+            with open(pdf, "rb") as f:
+                st.download_button("Download PDF", f, file_name="SAM_REPORT.pdf")
+        except Exception as e:
+            st.error(f"PDF Error: {e}")
 
 except Exception as e:
     st.error(f"⚠️ Error: {e}")
