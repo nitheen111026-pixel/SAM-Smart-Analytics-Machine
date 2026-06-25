@@ -141,7 +141,7 @@ def generate_full_report(df, cat_col, val_col, date_col):
 
     def header(title):
         if os.path.exists(logo_path):
-            elements.append(Image(logo_path, width=150, height=60))
+            elements.append(Image(logo_path, width=150, height=100))
         else:
             elements.append(Paragraph("SAM SMART ANALYTICS", styles["Title"]))
         elements.append(Spacer(1, 10))
