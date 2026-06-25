@@ -127,7 +127,7 @@ def generate_full_report(df, cat_col, val_col, date_col):
         elements.append(Spacer(1, 150))
         elements.append(Image("logo.png", width=300, height=150))
 
-    elements.append(Spacer(1, 25))
+    elements.append(Spacer(1, 42))
     elements.append(Paragraph("SMART ANALYTICS MACHINE", styles["Title"]))
     elements.append(Spacer(1, 30))
     elements.append(Paragraph("DEVELOPED BY NITHEEN.M", styles["Title"]))
