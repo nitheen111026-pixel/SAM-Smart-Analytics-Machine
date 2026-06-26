@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -6,12 +5,59 @@ import tempfile
 import os
 import matplotlib.pyplot as plt
 import base64
+import json
+import datetime
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 
 st.set_page_config(page_title="SAM SMART ANALYTICS MACHINE", layout="wide")
+
+# ===========================
+# LOGIN STORAGE
+# ===========================
+LOG_FILE = "user_logs.json"
+
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, "w") as f:
+        json.dump([], f)
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.user_email = ""
+
+# ===========================
+# LOGIN FUNCTION
+# ===========================
+def login_box():
+    st.markdown("### 🔐 Login Required to Upload")
+
+    email = st.text_input("Enter your Gmail")
+
+    if st.button("Login"):
+        if "@gmail.com" in email:
+            st.session_state.logged_in = True
+            st.session_state.user_email = email
+            st.success("✅ Login Successful")
+        else:
+            st.error("❌ Enter valid Gmail ID")
+
+# ===========================
+# SAVE LOG
+# ===========================
+def save_log(email, filename):
+    with open(LOG_FILE, "r") as f:
+        data = json.load(f)
+
+    data.append({
+        "email": email,
+        "file": filename,
+        "time": str(datetime.datetime.now())
+    })
+
+    with open(LOG_FILE, "w") as f:
+        json.dump(data, f, indent=4)
 
 # =====================================================
 # BACKGROUND IMAGE + TEXT + MOBILE FIX
@@ -124,7 +170,7 @@ def generate_insights(total, avg, top, low, growth, cat_summary):
     ]
 
 # =====================================================
-# PDF REPORT (UPDATED WITH COVER PAGE)
+# PDF REPORT (UNCHANGED)
 # =====================================================
 def generate_full_report(df, cat_col, val_col, date_col):
 
@@ -138,15 +184,14 @@ def generate_full_report(df, cat_col, val_col, date_col):
 
     logo_path = "logo.png"
 
-    # ===== NEW PAGE 1 =====
     if os.path.exists(logo_path):
         elements.append(Spacer(1, 150))
         elements.append(Image(logo_path, width=300, height=200))
 
-    elements.append(Spacer(1, 28))
-    elements.append(Paragraph('<font name="Times-Roman" size="28">DEVELOPED BY NITHEEN.M</font>', styles["Title"]))
-    elements.append(Spacer(1, 15))
-    elements.append(Paragraph('<font name="Times-Roman" size="15">BSC AI & DS</font>', styles["Title"]))
+    elements.append(Spacer(1, 40))
+    elements.append(Paragraph('<font name="Times-Roman" size="40">SMART ANALYTICS MACHINE</font>', styles["Title"]))
+    elements.append(Spacer(1, 30))
+    elements.append(Paragraph('<font name="Times-Roman" size="30">DEVELOPED BY NITHEEN.M</font>', styles["Title"]))
     elements.append(PageBreak())
 
     def header(title):
@@ -158,7 +203,6 @@ def generate_full_report(df, cat_col, val_col, date_col):
         elements.append(Paragraph(title, styles["Heading2"]))
         elements.append(Spacer(1, 10))
 
-    # PAGE 2–7 (UNCHANGED)
     header("Executive Summary")
 
     for line in generate_insights(total, avg, top, low, growth, cat_summary):
@@ -268,11 +312,17 @@ def generate_full_report(df, cat_col, val_col, date_col):
     return pdf_path
 
 # =====================================================
-# FILE INPUT + MAIN LOGIC (UNCHANGED)
+# FILE INPUT + LOGIN CONTROL
 # =====================================================
 file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
 
+# 🚨 LOGIN ONLY WHEN USER TRIES TO UPLOAD
+if file is not None and not st.session_state.logged_in:
+    login_box()
+    st.stop()
+
 if file is not None:
+    save_log(st.session_state.user_email, file.name)
     df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
 else:
     if os.path.exists("sample_data.csv"):
@@ -285,6 +335,9 @@ else:
 df = clean_data(df)
 st.success("Data Loaded")
 
+# =====================================================
+# MAIN LOGIC
+# =====================================================
 try:
     date_col = st.selectbox("Date Column", [c for c in df.columns if c.lower() == "order_date"])
     cat_col = st.selectbox("Category Column", [c for c in df.columns if c.lower() in ["city", "category", "product"]])
