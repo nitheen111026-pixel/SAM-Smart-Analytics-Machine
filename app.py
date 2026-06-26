@@ -370,3 +370,26 @@ try:
 
 except Exception as e:
     st.error(f"⚠️ Error: {e}")
+# ===========================
+# ADMIN PANEL (VIEW USERS)
+# ===========================
+st.sidebar.title("🔒 Admin Panel")
+
+admin_pass = st.sidebar.text_input("Enter Admin Password", type="password")
+
+if admin_pass == "sam5512":
+    st.sidebar.success("Admin Access Granted")
+
+    st.subheader("📊 User Upload Logs")
+
+    if os.path.exists("user_logs.json"):
+        with open("user_logs.json", "r") as f:
+            data = json.load(f)
+
+        if data:
+            df_logs = pd.DataFrame(data)
+            st.dataframe(df_logs)
+        else:
+            st.info("No users yet")
+    else:
+        st.error("Log file not found")
