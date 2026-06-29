@@ -188,8 +188,8 @@ def generate_full_report(df, cat_col, val_col, date_col):
         elements.append(Spacer(1, 150))
         elements.append(Image(logo_path, width=300, height=200))
 
-    elements.append(Spacer(1, 40))
-    elements.append(Paragraph('<font name="Times-Roman" size="40">SMART ANALYTICS MACHINE</font>', styles["Title"]))
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph('<font name="Times-Roman" size="20">SMART ANALYTICS MACHINE</font>', styles["Title"]))
     elements.append(Spacer(1, 30))
     elements.append(Paragraph('<font name="Times-Roman" size="30">DEVELOPED BY NITHEEN.M</font>', styles["Title"]))
     elements.append(PageBreak())
