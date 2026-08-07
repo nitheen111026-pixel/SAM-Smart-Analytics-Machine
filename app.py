@@ -1,395 +1,238 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
-import tempfile
-import os
 import matplotlib.pyplot as plt
-import base64
-import json
-import datetime
-
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, PageBreak
+from statsmodels.tsa.arima.model import ARIMA
+from reportlab.platypus import *
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+import tempfile, os
+import pyttsx3
 
-st.set_page_config(page_title="SAM SMART ANALYTICS MACHINE", layout="wide")
+# ---------------- CONFIG ----------------
+st.set_page_config(page_title="SAM", layout="wide")
 
-# ===========================
-# LOGIN STORAGE
-# ===========================
-LOG_FILE = "user_logs.json"
+# ---------------- THEME ----------------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:white;
+}
+.card {
+    background: rgba(255,255,255,0.05);
+    padding:20px;
+    border-radius:15px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 20px rgba(0,255,255,0.2);
+}
+button:hover {
+    box-shadow: 0 0 15px cyan;
+}
+</style>
+""", unsafe_allow_html=True)
 
-if not os.path.exists(LOG_FILE):
-    with open(LOG_FILE, "w") as f:
-        json.dump([], f)
+# ---------------- LOGIN ----------------
+if "auth" not in st.session_state:
+    st.session_state.auth = False
 
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.user_email = ""
-
-# ===========================
-# LOGIN FUNCTION
-# ===========================
-def login_box():
-    st.markdown("### 🔐 Login Required to Upload")
-
-    email = st.text_input("Enter your Gmail")
-
+if not st.session_state.auth:
+    st.title("🔐 SAM Login")
+    u = st.text_input("Username")
+    p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if "@gmail.com" in email:
-            st.session_state.logged_in = True
-            st.session_state.user_email = email
-            st.success("✅ Login Successful")
+        if u=="admin" and p=="admin":
+            st.session_state.auth=True
         else:
-            st.error("❌ Enter valid Gmail ID")
+            st.error("Invalid")
+    st.stop()
 
-# ===========================
-# SAVE LOG
-# ===========================
-def save_log(email, filename):
-    with open(LOG_FILE, "r") as f:
-        data = json.load(f)
+# ---------------- HEADER ----------------
+st.title("🚀 SAM – Smart Analytics Machine")
+st.caption("Turning Raw Data into Smart Decisions Instantly")
 
-    data.append({
-        "email": email,
-        "file": filename,
-        "time": str(datetime.datetime.now())
-    })
+# ---------------- SIDEBAR ----------------
+page = st.sidebar.radio("Navigation", [
+    "Home","Upload","Dashboard","Insights","Forecast","Ask SAM","Report"
+])
 
-    with open(LOG_FILE, "w") as f:
-        json.dump(data, f, indent=4)
-
-# =====================================================
-# BACKGROUND IMAGE + TEXT + MOBILE FIX
-# =====================================================
-def set_bg(image_file):
-    if os.path.exists(image_file):
-        with open(image_file, "rb") as f:
-            encoded = base64.b64encode(f.read()).decode()
-
-        st.markdown(f"""
-        <style>
-        .stApp {{
-            background: url("data:image/jpg;base64,{encoded}") no-repeat center center fixed;
-            background-size: cover;
-        }}
-
-        section[data-testid="stAppViewContainer"] {{
-            background: transparent;
-        }}
-
-        section[data-testid="stHeader"] {{
-            background: transparent;
-        }}
-
-        html, body, [class*="css"] {{
-            color: white !important;
-        }}
-
-        @media (max-width: 768px) {{
-            img {{
-                max-width: 80px !important;
-                height: auto !important;
-            }}
-        }}
-        </style>
-        """, unsafe_allow_html=True)
-
-set_bg("background.jpg")
-
-# =====================================================
-# HEADER
-# =====================================================
-col1, col2 = st.columns([1, 4])
-
-with col1:
-    if os.path.exists("logo.png"):
-        st.image("logo.png", width=120)
-
-with col2:
-    st.title("📊 SAM  -  SMART  ANALYTICS  MACHINE")
-
-# =====================================================
-# CLEAN DATA
-# =====================================================
-def clean_data(df):
+# ---------------- UTIL ----------------
+def clean(df):
     df.columns = df.columns.str.strip()
     df = df.drop_duplicates().fillna(0)
     return df
 
-# =====================================================
-# COMPLETE MONTHS
-# =====================================================
-def complete_months(df, date_col, val_col):
-    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+def detect(df):
+    date = [c for c in df.columns if "date" in c.lower()]
+    num = df.select_dtypes(include=np.number).columns.tolist()
+    cat = df.select_dtypes(include='object').columns.tolist()
+    return date, num, cat
 
-    full_range = pd.date_range(
-        start=df[date_col].min(),
-        end=df[date_col].max(),
-        freq="MS"
-    )
+# ---------------- AI STORY ----------------
+def storytelling(df, val, cat):
+    total = df[val].sum()
+    top = df.groupby(cat)[val].sum().idxmax()
+    growth = ((df[val].iloc[-1] - df[val].iloc[0])/(df[val].iloc[0]+1))*100
 
-    full_df = pd.DataFrame({"Month": full_range})
+    return f"""
+📊 The business generated a total revenue of {total:.2f}.  
 
-    monthly = df.groupby(pd.Grouper(key=date_col, freq="MS"))[val_col].sum().reset_index()
-    monthly.columns = ["Month", val_col]
+📈 Growth trend shows a change of {growth:.2f}%, indicating evolving market dynamics.  
 
-    monthly = full_df.merge(monthly, on="Month", how="left").fillna(0)
+🏆 The leading category is **{top}**, contributing the highest share.  
 
-    return monthly
+⚠️ Fluctuations suggest possible seasonal or demand-driven variations.  
 
-# =====================================================
-# ANALYSIS
-# =====================================================
-def analyze(df, cat_col, val_col, date_col):
-    cat_summary = df.groupby(cat_col)[val_col].sum().sort_values(ascending=False)
-    monthly = complete_months(df, date_col, val_col)
+🚀 Strategic focus on **{top}** can maximize future growth.
+"""
 
-    total = df[val_col].sum()
-    avg = df[val_col].mean()
-    top = cat_summary.idxmax()
-    low = cat_summary.idxmin()
+# ---------------- VOICE ----------------
+def speak(text):
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
 
-    growth = 0
-    if len(monthly) > 1:
-        growth = ((monthly[val_col].iloc[-1] - monthly[val_col].iloc[0]) / (monthly[val_col].iloc[0] + 1)) * 100
+# ---------------- FORECAST ----------------
+def forecast(df, val):
+    model = ARIMA(df[val], order=(1,1,1))
+    fit = model.fit()
+    return fit.forecast(6)
 
-    return total, avg, top, low, growth, cat_summary, monthly
-
-# =====================================================
-# INSIGHTS
-# =====================================================
-def generate_insights(total, avg, top, low, growth, cat_summary):
-    contribution = (cat_summary.max() / cat_summary.sum()) * 100
-    return [
-        f"Total Revenue: ₹{total:,.0f}",
-        f"Average Value: ₹{avg:,.0f}",
-        f"Top Category: {top} ({contribution:.1f}%)",
-        f"Lowest Category: {low}",
-        f"Growth: {growth:.2f}% ({'increasing' if growth>0 else 'decreasing'})"
-    ]
-
-# =====================================================
-# PDF REPORT (UNCHANGED)
-# =====================================================
-def generate_full_report(df, cat_col, val_col, date_col):
-
-    total, avg, top, low, growth, cat_summary, monthly = analyze(df, cat_col, val_col, date_col)
-
-    pdf_path = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf").name
-    doc = SimpleDocTemplate(pdf_path, pagesize=A4)
-
+# ---------------- PDF ----------------
+def generate_pdf(df, val, cat):
+    file = tempfile.NamedTemporaryFile(delete=False).name
+    doc = SimpleDocTemplate(file)
     styles = getSampleStyleSheet()
     elements = []
 
-    logo_path = "logo.png"
-
-    if os.path.exists(logo_path):
-        elements.append(Spacer(1, 150))
-        elements.append(Image(logo_path, width=300, height=200))
-
-    elements.append(Spacer(1, 20))
-    elements.append(Paragraph('<font name="Times-Roman" size="20">SMART ANALYTICS MACHINE</font>', styles["Title"]))
-    elements.append(Spacer(1, 30))
-    elements.append(Paragraph('<font name="Times-Roman" size="30">DEVELOPED BY NITHEEN.M</font>', styles["Title"]))
+    # PAGE 1
+    elements.append(Paragraph("SAM Executive Report", styles['Title']))
+    elements.append(Spacer(1,20))
+    elements.append(Paragraph("Premium Business Insights Report", styles['Normal']))
     elements.append(PageBreak())
 
-    def header(title):
-        if os.path.exists(logo_path):
-            elements.append(Image(logo_path, width=150, height=100))
-        else:
-            elements.append(Paragraph("SAM SMART ANALYTICS", styles["Title"]))
-        elements.append(Spacer(1, 10))
-        elements.append(Paragraph(title, styles["Heading2"]))
-        elements.append(Spacer(1, 10))
-
-    header("Executive Summary")
-
-    for line in generate_insights(total, avg, top, low, growth, cat_summary):
-        elements.append(Paragraph(line, styles["Normal"]))
-        elements.append(Spacer(1, 8))
-
-    plt.figure()
-    cat_summary.plot(kind='bar')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    img1 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img1.name)
-    plt.close()
-
-    elements.append(Image(img1.name, width=500, height=300))
+    # PAGE 2 KPI
+    total = df[val].sum()
+    elements.append(Paragraph("KPI Summary", styles['Heading2']))
+    elements.append(Paragraph(f"Total Revenue: {total:.2f}", styles['Normal']))
     elements.append(PageBreak())
 
-    header("Category Distribution")
-
-    plt.figure()
-    cat_summary.plot(kind='pie', autopct='%1.1f%%')
-    plt.ylabel("")
-    plt.tight_layout()
-    img2 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img2.name)
+    # PAGE 3 CHART
+    img = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
+    df.groupby(cat)[val].sum().plot(kind='bar')
+    plt.savefig(img)
     plt.close()
-
-    elements.append(Image(img2.name, width=500, height=350))
+    elements.append(Paragraph("Category Performance", styles['Heading2']))
+    elements.append(Image(img))
     elements.append(PageBreak())
 
-    header("Sales Trend with Average")
-
-    months = monthly["Month"].dt.strftime('%b')
-    values = monthly[val_col]
-    avg_line = values.mean()
-
-    plt.figure()
-    plt.plot(months, values, marker='o', label="Sales")
-    plt.axhline(avg_line, linestyle='--', label=f"Avg ({int(avg_line)})")
-
-    plt.xticks(rotation=45)
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
-
-    img3 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img3.name)
+    # PAGE 4 TREND
+    img2 = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
+    df[val].plot()
+    plt.savefig(img2)
     plt.close()
-
-    elements.append(Image(img3.name, width=500, height=300))
+    elements.append(Paragraph("Trend Analysis", styles['Heading2']))
+    elements.append(Image(img2))
     elements.append(PageBreak())
 
-    header("Top Performing Months")
-
-    monthly_copy = monthly.copy()
-    monthly_copy["MonthName"] = monthly_copy["Month"].dt.strftime('%b')
-
-    top_months = monthly_copy.sort_values(by=val_col, ascending=False).head(5)
-
-    plt.figure()
-    bars = plt.bar(top_months["MonthName"], top_months[val_col])
-
-    for bar in bars:
-        y = bar.get_height()
-        plt.text(bar.get_x() + bar.get_width()/2, y, f'{int(y)}',
-                 ha='center', va='bottom')
-
-    plt.tight_layout()
-
-    img4 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img4.name)
-    plt.close()
-
-    elements.append(Image(img4.name, width=500, height=300))
+    # PAGE 5 INSIGHTS
+    elements.append(Paragraph("AI Insights", styles['Heading2']))
+    elements.append(Paragraph(storytelling(df,val,cat), styles['Normal']))
     elements.append(PageBreak())
 
-    header("Top Category Trend")
-
-    top_df = df[df[cat_col] == top]
-    top_month = complete_months(top_df, date_col, val_col)
-
-    plt.figure()
-    plt.plot(top_month["Month"].dt.strftime('%b'), top_month[val_col], marker='o')
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-
-    img5 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img5.name)
+    # PAGE 6 FORECAST
+    pred = forecast(df,val)
+    img3 = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
+    pd.Series(pred).plot()
+    plt.savefig(img3)
     plt.close()
-
-    elements.append(Image(img5.name, width=500, height=300))
-    elements.append(PageBreak())
-
-    header("Category Comparison")
-
-    plt.figure()
-    cat_summary.sort_values().plot(kind='barh')
-    plt.tight_layout()
-
-    img6 = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-    plt.savefig(img6.name)
-    plt.close()
-
-    elements.append(Image(img6.name, width=500, height=300))
+    elements.append(Paragraph("Forecast", styles['Heading2']))
+    elements.append(Image(img3))
 
     doc.build(elements)
-    return pdf_path
+    return file
 
-# =====================================================
-# FILE INPUT + LOGIN CONTROL
-# =====================================================
-file = st.file_uploader("Upload CSV / Excel", type=["csv", "xlsx"])
+# ---------------- HOME ----------------
+if page=="Home":
+    st.markdown("## Welcome to SAM 🚀")
+    st.info("Upload data → Get Insights → Generate Reports")
 
-# 🚨 LOGIN ONLY WHEN USER TRIES TO UPLOAD
-if file is not None and not st.session_state.logged_in:
-    login_box()
-    st.stop()
+# ---------------- UPLOAD ----------------
+if page=="Upload":
+    file = st.file_uploader("Upload CSV/Excel", ["csv","xlsx"])
+    if file:
+        df = pd.read_csv(file) if file.name.endswith("csv") else pd.read_excel(file)
+        st.session_state.df = df
 
-if file is not None:
-    save_log(st.session_state.user_email, file.name)
-    df = pd.read_csv(file) if file.name.endswith(".csv") else pd.read_excel(file)
-else:
-    if os.path.exists("sample_data.csv"):
-        st.info("📊 Using Sample Dataset (Demo Mode)")
-        df = pd.read_csv("sample_data.csv")
-    else:
-        st.error("❌ sample_data.csv not found")
-        st.stop()
+        st.subheader("Raw Data")
+        st.dataframe(df.head())
 
-df = clean_data(df)
-st.success("Data Loaded")
+        clean_df = clean(df)
+        st.subheader("Cleaned Data")
+        st.dataframe(clean_df.head())
 
-# =====================================================
-# MAIN LOGIC
-# =====================================================
-try:
-    date_col = st.selectbox("Date Column", [c for c in df.columns if c.lower() == "order_date"])
-    cat_col = st.selectbox("Category Column", [c for c in df.columns if c.lower() in ["city", "category", "product"]])
-    val_col = st.selectbox("Value Column", [c for c in df.columns if c.lower() in ["sales", "profit", "quantity"]])
+# ---------------- DASHBOARD ----------------
+if page=="Dashboard" and "df" in st.session_state:
+    df = clean(st.session_state.df)
+    date,num,cat = detect(df)
 
-    if not pd.api.types.is_numeric_dtype(df[val_col]):
-        st.error("❌ Value column must be numeric")
-        st.stop()
+    val = num[0]
+    cat = cat[0]
 
-    df[date_col] = pd.to_datetime(df[date_col], errors="coerce")
+    col1,col2,col3 = st.columns(3)
+    col1.metric("Total", f"{df[val].sum():.2f}")
+    col2.metric("Average", f"{df[val].mean():.2f}")
+    col3.metric("Top", df.groupby(cat)[val].sum().idxmax())
 
-    total, avg, top, low, growth, cat_summary, monthly = analyze(df, cat_col, val_col, date_col)
+    st.plotly_chart(px.line(df, y=val, title="Trend"))
+    st.plotly_chart(px.bar(df, x=cat, y=val, color=cat))
+    st.plotly_chart(px.pie(df, names=cat, values=val))
+    st.plotly_chart(px.density_heatmap(df, x=cat, y=val))
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total", f"₹{total:,.0f}")
-    c2.metric("Top", top)
-    c3.metric("Growth %", f"{growth:.2f}%")
+# ---------------- INSIGHTS ----------------
+if page=="Insights" and "df" in st.session_state:
+    df = clean(st.session_state.df)
+    _,num,cat = detect(df)
 
-    st.plotly_chart(px.bar(cat_summary.reset_index(), x=cat_col, y=val_col, color=cat_col))
-    st.plotly_chart(px.line(monthly, x="Month", y=val_col, markers=True))
+    text = storytelling(df,num[0],cat[0])
+    st.write(text)
 
-    st.subheader("Insights")
-    for line in generate_insights(total, avg, top, low, growth, cat_summary):
-        st.write(line)
+    if st.button("🔊 Voice"):
+        speak(text)
 
-    if st.button("Generate PDF Report"):
-        pdf = generate_full_report(df, cat_col, val_col, date_col)
-        with open(pdf, "rb") as f:
-            st.download_button("Download PDF", f, file_name="SAM_REPORT.pdf")
+# ---------------- FORECAST ----------------
+if page=="Forecast" and "df" in st.session_state:
+    df = clean(st.session_state.df)
+    _,num,_ = detect(df)
 
-except Exception as e:
-    st.error(f"⚠️ Error: {e}")
-# ===========================
-# ADMIN PANEL (VIEW USERS)
-# ===========================
-st.sidebar.title("🔒 Admin Panel")
+    pred = forecast(df,num[0])
+    st.line_chart(pred)
 
-admin_pass = st.sidebar.text_input("Enter Admin Password", type="password")
+# ---------------- ASK SAM ----------------
+if page=="Ask SAM" and "df" in st.session_state:
+    df = clean(st.session_state.df)
+    q = st.text_input("Ask your data")
 
-if admin_pass == "sam5512":
-    st.sidebar.success("Admin Access Granted")
-
-    st.subheader("📊 User Upload Logs")
-
-    if os.path.exists("user_logs.json"):
-        with open("user_logs.json", "r") as f:
-            data = json.load(f)
-
-        if data:
-            df_logs = pd.DataFrame(data)
-            st.dataframe(df_logs)
+    if q:
+        col = df.select_dtypes(include=np.number).columns[0]
+        if "highest" in q:
+            st.success(df[col].max())
+        elif "average" in q:
+            st.success(df[col].mean())
         else:
-            st.info("No users yet")
-    else:
-        st.error("Log file not found")
+            st.info("Try: highest, average")
+
+# ---------------- REPORT ----------------
+if page=="Report" and "df" in st.session_state:
+    df = clean(st.session_state.df)
+    _,num,cat = detect(df)
+
+    if st.button("Generate Premium Report"):
+        pdf = generate_pdf(df,num[0],cat[0])
+        with open(pdf,"rb") as f:
+            st.download_button("Download PDF", f, "SAM_Report.pdf")
+
+# ---------------- EMPTY ----------------
+if "df" not in st.session_state:
+    st.warning("Upload dataset to start 🚀")
