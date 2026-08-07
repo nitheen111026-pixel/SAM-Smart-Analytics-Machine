@@ -6,14 +6,12 @@ import matplotlib.pyplot as plt
 from statsmodels.tsa.arima.model import ARIMA
 from reportlab.platypus import *
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-import tempfile, os
-import pyttsx3
+import tempfile
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="SAM", layout="wide")
 
-# ---------------- THEME ----------------
+# ---------------- UI ----------------
 st.markdown("""
 <style>
 .stApp {
@@ -42,10 +40,10 @@ if not st.session_state.auth:
     u = st.text_input("Username")
     p = st.text_input("Password", type="password")
     if st.button("Login"):
-        if u=="admin" and p=="admin":
-            st.session_state.auth=True
+        if u == "admin" and p == "admin":
+            st.session_state.auth = True
         else:
-            st.error("Invalid")
+            st.error("Invalid credentials")
     st.stop()
 
 # ---------------- HEADER ----------------
@@ -57,7 +55,7 @@ page = st.sidebar.radio("Navigation", [
     "Home","Upload","Dashboard","Insights","Forecast","Ask SAM","Report"
 ])
 
-# ---------------- UTIL ----------------
+# ---------------- FUNCTIONS ----------------
 def clean(df):
     df.columns = df.columns.str.strip()
     df = df.drop_duplicates().fillna(0)
@@ -69,86 +67,47 @@ def detect(df):
     cat = df.select_dtypes(include='object').columns.tolist()
     return date, num, cat
 
-# ---------------- AI STORY ----------------
 def storytelling(df, val, cat):
     total = df[val].sum()
     top = df.groupby(cat)[val].sum().idxmax()
     growth = ((df[val].iloc[-1] - df[val].iloc[0])/(df[val].iloc[0]+1))*100
 
     return f"""
-📊 The business generated a total revenue of {total:.2f}.  
-
-📈 Growth trend shows a change of {growth:.2f}%, indicating evolving market dynamics.  
-
-🏆 The leading category is **{top}**, contributing the highest share.  
-
-⚠️ Fluctuations suggest possible seasonal or demand-driven variations.  
-
-🚀 Strategic focus on **{top}** can maximize future growth.
+Sales reached {total:.2f}.  
+Top category is {top}.  
+Growth trend shows {growth:.2f}% change.  
+Focus on {top} for scaling.  
 """
 
-# ---------------- VOICE ----------------
-def speak(text):
-    engine = pyttsx3.init()
-    engine.say(text)
-    engine.runAndWait()
-
-# ---------------- FORECAST ----------------
 def forecast(df, val):
     model = ARIMA(df[val], order=(1,1,1))
     fit = model.fit()
     return fit.forecast(6)
 
-# ---------------- PDF ----------------
 def generate_pdf(df, val, cat):
     file = tempfile.NamedTemporaryFile(delete=False).name
     doc = SimpleDocTemplate(file)
     styles = getSampleStyleSheet()
     elements = []
 
-    # PAGE 1
     elements.append(Paragraph("SAM Executive Report", styles['Title']))
     elements.append(Spacer(1,20))
-    elements.append(Paragraph("Premium Business Insights Report", styles['Normal']))
-    elements.append(PageBreak())
 
-    # PAGE 2 KPI
     total = df[val].sum()
-    elements.append(Paragraph("KPI Summary", styles['Heading2']))
     elements.append(Paragraph(f"Total Revenue: {total:.2f}", styles['Normal']))
     elements.append(PageBreak())
 
-    # PAGE 3 CHART
     img = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
     df.groupby(cat)[val].sum().plot(kind='bar')
     plt.savefig(img)
     plt.close()
-    elements.append(Paragraph("Category Performance", styles['Heading2']))
+
+    elements.append(Paragraph("Category Analysis", styles['Heading2']))
     elements.append(Image(img))
     elements.append(PageBreak())
 
-    # PAGE 4 TREND
-    img2 = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
-    df[val].plot()
-    plt.savefig(img2)
-    plt.close()
-    elements.append(Paragraph("Trend Analysis", styles['Heading2']))
-    elements.append(Image(img2))
-    elements.append(PageBreak())
-
-    # PAGE 5 INSIGHTS
-    elements.append(Paragraph("AI Insights", styles['Heading2']))
+    elements.append(Paragraph("Insights", styles['Heading2']))
     elements.append(Paragraph(storytelling(df,val,cat), styles['Normal']))
-    elements.append(PageBreak())
-
-    # PAGE 6 FORECAST
-    pred = forecast(df,val)
-    img3 = tempfile.NamedTemporaryFile(suffix=".png", delete=False).name
-    pd.Series(pred).plot()
-    plt.savefig(img3)
-    plt.close()
-    elements.append(Paragraph("Forecast", styles['Heading2']))
-    elements.append(Image(img3))
 
     doc.build(elements)
     return file
@@ -156,7 +115,7 @@ def generate_pdf(df, val, cat):
 # ---------------- HOME ----------------
 if page=="Home":
     st.markdown("## Welcome to SAM 🚀")
-    st.info("Upload data → Get Insights → Generate Reports")
+    st.info("Upload data → Analyze → Generate insights")
 
 # ---------------- UPLOAD ----------------
 if page=="Upload":
@@ -198,8 +157,16 @@ if page=="Insights" and "df" in st.session_state:
     text = storytelling(df,num[0],cat[0])
     st.write(text)
 
-    if st.button("🔊 Voice"):
-        speak(text)
+    # ✅ Browser Voice (Cloud Safe)
+    st.markdown(f"""
+    <script>
+    function speakText() {{
+        var msg = new SpeechSynthesisUtterance(`{text}`);
+        window.speechSynthesis.speak(msg);
+    }}
+    </script>
+    <button onclick="speakText()">🔊 Speak Insights</button>
+    """, unsafe_allow_html=True)
 
 # ---------------- FORECAST ----------------
 if page=="Forecast" and "df" in st.session_state:
@@ -228,7 +195,7 @@ if page=="Report" and "df" in st.session_state:
     df = clean(st.session_state.df)
     _,num,cat = detect(df)
 
-    if st.button("Generate Premium Report"):
+    if st.button("Generate Report"):
         pdf = generate_pdf(df,num[0],cat[0])
         with open(pdf,"rb") as f:
             st.download_button("Download PDF", f, "SAM_Report.pdf")
